@@ -10,18 +10,15 @@ public class PlayerUI : MonoBehaviour
     [SerializeField] private Joystick moveJoystick;
     [SerializeField] private Joystick lookJoystick;
 
-    [SerializeField] private Button grabButton;
-    [SerializeField] private Button scanButton;
+    [SerializeField] private Button interactButton;
 
     public Joystick MoveJoystick { get { return moveJoystick; } }
     public Joystick LookJoystick { get { return lookJoystick; } }
-    public Button GrabButton { get { return grabButton; } }
-    public Button ScanButton { get { return scanButton; } }
+    public Button InteractButton { get { return interactButton; } }
 
     private void Start()
     {
-        grabButton.onClick.AddListener(() => { playerEvent.OnGrab?.Invoke(); });
-        scanButton.onClick.AddListener(() => { playerEvent.OnScan?.Invoke(); });
+        interactButton.onClick.AddListener(() => { playerEvent.OnInteract?.Invoke(); });
     }
 
     private void Update()
@@ -31,5 +28,6 @@ public class PlayerUI : MonoBehaviour
 
         Vector2 lookInput = new Vector2(lookJoystick.Horizontal, lookJoystick.Vertical);
         playerEvent.Rotate(lookInput);
+
     }
 }

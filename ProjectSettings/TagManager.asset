@@ -4,8 +4,9 @@
 TagManager:
   serializedVersion: 2
   tags:
-  - Missile
   - Target
+  - Bucket
+  - Item
   layers:
   - Default
   - TransparentFX
@@ -18,8 +19,8 @@ TagManager:
   - Item
   - Sign
   - Face
-  - 
-  - 
+  - Tool
+  - Payment
   - 
   - 
   - 

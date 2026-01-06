@@ -16,7 +16,7 @@ GameObject:
   - component: {fileID: 6401993988540445322}
   m_Layer: 8
   m_Name: Bolt
-  m_TagString: Untagged
+  m_TagString: Item
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -48,10 +48,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: faedc1e7fde546243b21a05715649609, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  storeEvent: {fileID: 11400000, guid: 892be80f07a4f234fb901a04d5743a2e, type: 2}
   itemName: Bolt
+  itemState: 0
   basicPrice: 5
   rb: {fileID: 6401993988540445322}
   col: {fileID: 5037400385809303986}
+  targetBag: {fileID: 0}
+  speed: 5
+  stoppingDistance: 0.1
+  onBag: 0
 --- !u!33 &1623322819994383322
 MeshFilter:
   m_ObjectHideFlags: 0

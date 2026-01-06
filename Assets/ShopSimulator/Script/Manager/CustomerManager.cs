@@ -26,6 +26,8 @@ public class CustomerManager : Singleton<CustomerManager>
 
     private void Update()
     {
+        if (customerList.Count >= maxCustomer) return;
+
         spawnInterval -= Time.deltaTime;
 
         if (spawnInterval <= 0)

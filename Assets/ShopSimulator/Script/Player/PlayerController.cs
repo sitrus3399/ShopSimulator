@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using UnityEditor;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody))]
@@ -6,8 +8,10 @@ public class PlayerController : MonoBehaviour
     [Header("References")]
     [SerializeField] private Camera playerCamera;
     [SerializeField] private PlayerEvents playerEvent;
+    [SerializeField] private StoreEvents storeEvent;
 
     private Rigidbody rb;
+    private PlayerState playerState;
 
     [Header("Movement Settings")]
     private Vector3 currentMoveInput;
@@ -22,14 +26,18 @@ public class PlayerController : MonoBehaviour
     [Header("Raycast Settings")]
     [SerializeField] private float raycastDistance = 10f; // Jarak raycast
     [SerializeField] private LayerMask allLayer; // Layer untuk objek Item
-    [SerializeField] private LayerMask itemLayer; // Layer untuk objek Item
     [SerializeField] private GameObject whiteCirclePrefab; // Prefab lingkaran merah
     [SerializeField] private GameObject redCirclePrefab; // Prefab lingkaran merah
 
     [Header("Item")]
-    private GameObject currentItem;
+    [SerializeField] private GameObject currentItem;
+    [SerializeField] private GameObject currentTarget;
     private Item itemOnHand;
     [SerializeField] private Transform handPoint;
+
+    [Header("Payment")]
+    [SerializeField] private Transform edcPoint;
+    [SerializeField] private GameObject currentPayment;
 
     private void Start()
     {
@@ -39,22 +47,30 @@ public class PlayerController : MonoBehaviour
 
         if (playerCamera != null)
             playerCamera.gameObject.tag = "MainCamera";
+
+        playerState = PlayerState.Idle;
     }
 
     private void OnEnable()
     {
         playerEvent.OnMove += UpdateMoveInput;
         playerEvent.OnRotate += UpdateRotateInput;
-        playerEvent.OnGrab += GrabItem;
-        playerEvent.OnScan += ScanItem;
+        playerEvent.OnUseEDC += UseEDC;
     }
 
     private void OnDisable()
     {
         playerEvent.OnMove -= UpdateMoveInput;
         playerEvent.OnRotate -= UpdateRotateInput;
-        playerEvent.OnGrab -= GrabItem;
-        playerEvent.OnScan -= ScanItem;
+        playerEvent.OnInteract -= ScanItem;
+        playerEvent.OnUseEDC -= UseEDC;
+    }
+
+    void UseEDC(EDCMachine edcMachine)
+    {
+        edcMachine.gameObject.transform.parent = edcPoint.transform;
+        edcMachine.gameObject.transform.localPosition = Vector3.zero;
+        edcMachine.gameObject.transform.rotation = edcPoint.rotation;
     }
 
     private void Update()
@@ -65,20 +81,16 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        HandleMovement();
+        if (playerState == PlayerState.Idle)
+        {
+            HandleMovement();
+        }
     }
 
     private void HandleMovement()
     {
-        //float moveX = playerUI.MoveJoystick.Horizontal;
-        //float moveZ = playerUI.MoveJoystick.Vertical;
-
         Vector3 moveDir = (transform.right * currentMoveInput.x) + (transform.forward * currentMoveInput.z);
         rb.velocity = new Vector3(moveDir.x * moveSpeed, rb.velocity.y, moveDir.z * moveSpeed);
-
-        //Vector3 moveDir = (transform.right * moveX) + (transform.forward * moveZ);
-
-        //rb.velocity = new Vector3(moveDir.x * moveSpeed, rb.velocity.y, moveDir.z * moveSpeed);
     }
 
     private void UpdateMoveInput(Vector3 input)
@@ -101,55 +113,104 @@ public class PlayerController : MonoBehaviour
     private void UpdateRotateInput(Vector2 input)
     {
         currentLookInput = input;
-    } 
+    }
 
     private void HandleRaycast()
     {
         RaycastHit hit;
-
         Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
-        if (Physics.Raycast(ray, out hit, raycastDistance, itemLayer))
+
+        if (Physics.Raycast(ray, out hit, raycastDistance, allLayer))
         {
-            Debug.DrawLine(ray.origin, hit.point, Color.red);
+            GameObject hitObject = hit.collider.gameObject;
 
-            currentItem = hit.collider.gameObject;
-
-            if (whiteCirclePrefab != null)
+            if (hitObject != currentTarget)
             {
-                whiteCirclePrefab.SetActive(false);
+                ClearPreviousTarget();
+                currentTarget = hitObject;
+                SetupNewTarget(hitObject, hit.collider.gameObject.layer);
             }
 
-            if (redCirclePrefab != null)
-            {
-                redCirclePrefab.SetActive(true);
-                redCirclePrefab.transform.position = hit.point;
-            }
-        }
-        else if (Physics.Raycast(ray, out hit, raycastDistance, allLayer))
-        {
-            Debug.DrawLine(ray.origin, hit.point, Color.white);
-
-            ResetGrabTarget();
-
-            if (redCirclePrefab != null)
-            {
-                redCirclePrefab.SetActive(false);
-            }
-
-            if (whiteCirclePrefab != null)
-            {
-                whiteCirclePrefab.SetActive(true);
-                whiteCirclePrefab.transform.position = hit.point;
-            }
+            UpdateUIPosition(hit.point);
         }
         else
         {
-            ResetGrabTarget();
-            if (redCirclePrefab != null) redCirclePrefab.SetActive(false);
-            if (whiteCirclePrefab != null) whiteCirclePrefab.SetActive(false);
-
-            Debug.DrawRay(ray.origin, ray.direction * raycastDistance, Color.black);
+            if (currentTarget != null)
+            {
+                ClearPreviousTarget();
+            }
+            ResetRaycastVisuals();
         }
+    }
+
+    private void SetupNewTarget(GameObject obj, int layer)
+    {
+        if (layer == LayerMask.NameToLayer("Item"))
+        {
+            currentItem = obj;
+            playerEvent.OnInteract += ScanItem;
+            SetUIState(true, false);
+        }
+        else if (layer == LayerMask.NameToLayer("Tool"))
+        {
+            playerEvent.OnInteract += GrabItem;
+            SetUIState(true, false);
+        }
+        else if (layer == LayerMask.NameToLayer("Stain"))
+        {
+            playerEvent.OnInteract += CleanStain;
+            SetUIState(true, false);
+        }
+        else if (layer == LayerMask.NameToLayer("Payment"))
+        {
+            currentPayment = obj;
+
+            playerEvent.OnInteract += TakePayment;
+            SetUIState(true, false);
+        }
+        else
+        {
+            SetUIState(false, true);
+        }
+    }
+
+    private void ClearPreviousTarget()
+    {
+        if (currentTarget == null) return;
+
+        playerEvent.OnInteract -= ScanItem;
+        playerEvent.OnInteract -= GrabItem;
+        playerEvent.OnInteract -= CleanStain;
+        playerEvent.OnInteract -= TakePayment;
+
+        currentTarget = null;
+        ResetGrabTarget();
+        ResetPaymentTarget();
+    }
+
+    private void SetUIState(bool redActive, bool whiteActive)
+    {
+        if (redCirclePrefab != null) redCirclePrefab.SetActive(redActive);
+        if (whiteCirclePrefab != null) whiteCirclePrefab.SetActive(whiteActive);
+    }
+
+    private void UpdateUIPosition(Vector3 position)
+    {
+        if (redCirclePrefab != null && redCirclePrefab.activeSelf)
+        {
+            redCirclePrefab.transform.position = position;
+        }
+
+        if (whiteCirclePrefab != null && whiteCirclePrefab.activeSelf)
+        {
+            whiteCirclePrefab.transform.position = position;
+        } 
+    }
+
+    private void ResetRaycastVisuals()
+    {
+        SetUIState(false, false);
+        Debug.DrawRay(playerCamera.transform.position, playerCamera.transform.forward * raycastDistance, Color.black);
     }
 
     private void ResetGrabTarget()
@@ -157,36 +218,46 @@ public class PlayerController : MonoBehaviour
         currentItem = null;
     }
 
-    public void GrabItem()
+    private void ResetPaymentTarget()
     {
-        if (currentItem != null)
-        {
-            //Destroy(currentItem);
-
-            if (itemOnHand == null)
-            {
-                itemOnHand = currentItem.GetComponent<Item>();
-                itemOnHand.ChangeState(ItemState.Take);
-                itemOnHand.transform.parent = handPoint;
-                itemOnHand.transform.localPosition = new Vector3(0, 0, 0);
-            }
-            else
-            {
-                DropItem();
-            }
-            ResetGrabTarget();
-        }
+        currentPayment = null;
     }
 
-    void DropItem()
+    void GrabItem()
+    {
+
+    }
+
+    void CleanStain()
     {
 
     }
 
     void ScanItem()
     {
+        if (!currentItem) return;
+
+        itemOnHand = currentItem.GetComponent<Item>();
+
         if (!itemOnHand) return;
 
         itemOnHand.ChangeState(ItemState.Scan);
     }
+
+    void TakePayment()
+    {
+        if (currentPayment != null)
+        {
+            Payment tmpPayment = currentPayment.GetComponent<Payment>();
+            storeEvent.TakePayment(tmpPayment.Price, tmpPayment.PaymentType);
+        }
+    }
+}
+
+[System.Serializable]
+public enum PlayerState
+{ 
+    Idle,
+    Cashier,
+    Cleaning,
 }

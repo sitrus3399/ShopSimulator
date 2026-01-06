@@ -28,6 +28,12 @@ public class Customer : MonoBehaviour
 
     private bool hasDroppedItems = false;
 
+    [Header("Payment")]
+    [SerializeField] private Payment cashPayment;
+    [SerializeField] private Payment cardPayment;
+
+    public List<Item> ItemOnHand { get { return itemOnHand; } }
+
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
@@ -117,20 +123,30 @@ public class Customer : MonoBehaviour
                 {
                     //Debug.Log($"Mengambil item: {buyList[currentItemIndex]} (Index: {currentItemIndex})");
 
-                    for (int i = targetShelf.Items.Count - 1; i >= 0; i--)
+                    if (targetShelf != null)
                     {
-                        Item item = targetShelf.Items[i];
-
-                        if (item.ItemName == buyList[currentItemIndex])
+                        if (targetShelf.Items.Count > 0)
                         {
-                            targetShelf.RemoveItem(item);
+                            for (int i = targetShelf.Items.Count - 1; i >= 0; i--)
+                            {
+                                Item item = targetShelf.Items[i];
 
-                            itemOnHand.Add(item); // Dipindah ke tangan atau tas belanja
-                            item.transform.parent = itemOnHandLocation;
-                            item.transform.localPosition = new Vector3(0, 0, 0);
+                                if (item.ItemName == buyList[currentItemIndex])
+                                {
+                                    targetShelf.RemoveItem(item);
 
-                            break;
+                                    itemOnHand.Add(item); // Dipindah ke tangan atau tas belanja
+                                    item.transform.parent = itemOnHandLocation;
+                                    item.transform.localPosition = new Vector3(0, 0, 0);
+                                    item.ChangeState(ItemState.Take);
+                                    break;
+                                }
+                            }
                         }
+                    }
+                    else
+                    {
+                        Debug.LogWarning("SHELF DITEMUKAN KOSONG");
                     }
 
                     currentItemIndex++;
@@ -155,6 +171,11 @@ public class Customer : MonoBehaviour
                 break;
             case CustomerState.OnCashier:
                 //Waiting item scan
+                if (target != null)
+                {
+                    agent.SetDestination(target.position);
+                    distance = Vector3.Distance(transform.position, target.position);
+                }
 
                 CheckIfFirstInLine();
                 break;
@@ -200,6 +221,9 @@ public class Customer : MonoBehaviour
         {
             case CustomerState.ToStore:
                 SetTarget(ShopManager.Instance.FrontPoint);
+
+                cashPayment.gameObject.SetActive(false);
+                cardPayment.gameObject.SetActive(false);
                 break;
             case CustomerState.EnterStore:
                 SetTarget(ShopManager.Instance.EntrancePoint);
@@ -232,9 +256,12 @@ public class Customer : MonoBehaviour
                 break;
             case CustomerState.ExitStore:
                 //agent.isStopped = false; // Mulai jalan lagi
-                ShopManager.Instance.CashierDesk.RemoveCustomer(this);
+                //ShopManager.Instance.CashierDesk.RemoveCustomer(this);
+                storeEvent.OnPayment -= Payment;
+
                 SetTarget(ShopManager.Instance.FrontPoint);
-                CheckQueuePoint(); // Ini akan memicu SortQueue() untuk memajukan antrian berikutnya
+                
+                //CheckQueuePoint();
                 break;
             case CustomerState.ToDespawn:
                 SetTarget(CustomerManager.Instance.SpawnPoint);
@@ -307,16 +334,29 @@ public class Customer : MonoBehaviour
     {
         if (state != CustomerState.ToCashier && state != CustomerState.OnCashier) return;
 
-        var cashier = ShopManager.Instance.CashierDesk;
+        Cashier cashier = ShopManager.Instance.CashierDesk;
 
         if (cashier.IsFirstInQueue(this) && !hasDroppedItems)
         {
-            distance = Vector3.Distance(transform.position, target.position);
-            if (distance < triggerDistance)
+            float distToTarget = Vector3.Distance(transform.position, target.position);
+
+            if (distToTarget < 1f)
             {
+                cashier.SetFirstCustomer(this);
                 DropItemsToCashier();
             }
         }
+
+        //if (cashier.IsFirstInQueue(this) && !hasDroppedItems)
+        //{
+        //    cashier.SetFirstCustomer(this);
+
+        //    distance = Vector3.Distance(transform.position, target.position);
+        //    if (distance < triggerDistance)
+        //    {
+        //        DropItemsToCashier();
+        //    }
+        //}
     }
 
     private void DropItemsToCashier()
@@ -328,12 +368,38 @@ public class Customer : MonoBehaviour
             item.transform.parent = ShopManager.Instance.CashierDesk.DropPoint;
             item.transform.localPosition = Vector3.zero;
             item.ChangeState(ItemState.Drop);
+            item.SetOnCashier(true);
         }
 
-        // Mulai proses di kasir
-        //StartCoroutine(ShopManager.Instance.CashierDesk.ProcessCustomerItems(this, itemOnHand));
+        storeEvent.OnPayment += Payment;
 
-        itemOnHand.Clear();
+        //itemOnHand.Clear();
+    }
+
+    void Payment(float price)
+    {
+        //int indexPayment = Random.Range(0, 3);
+        int indexPayment = 1;
+
+        Debug.Log(indexPayment);
+        switch (indexPayment)
+        {
+            case 0: //Bayar pas
+                cashPayment.gameObject.SetActive(true);
+                cashPayment.SetPrice(price);
+                break;
+            case 1: //Bayar kartu
+                cardPayment.gameObject.SetActive(true);
+                cardPayment.SetPrice(price);
+                break;
+            case 2: //Bayar lebih
+                cashPayment.gameObject.SetActive(true);
+                int addPrice = Random.Range(0, 20);
+                cardPayment.SetPrice(price + addPrice);
+                break;
+            default:
+                break;
+        }
     }
 }
 
