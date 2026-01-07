@@ -18,9 +18,11 @@ public class Cashier : MonoBehaviour
     public Action<Transform> SetQueuePoint;
 
     [SerializeField] private Transform dropPoint;
-    [SerializeField] private Transform dropPointEDC;
 
+    [Header("Payment")]
+    [SerializeField] private Transform dropPointEDC;
     [SerializeField] private EDCMachine edcMachine;
+    [SerializeField] private CashMachine cashMachine;
 
     [Header("UI")]
     [SerializeField] private TMP_Text billText;
@@ -36,6 +38,17 @@ public class Cashier : MonoBehaviour
         storeEvent.OnTakePayment += TakePayment;
         storeEvent.OnFinishCustomer += NextCustomer;
         storeEvent.OnExitEDC += ExitEDC;
+        storeEvent.OnExitCashMachine += ExitCashMachine;
+    }
+
+    private void OnDisable()
+    {
+        storeEvent.OnQueue -= SortQueue;
+        storeEvent.OnItemRegister -= AddBill;
+        storeEvent.OnTakePayment -= TakePayment;
+        storeEvent.OnFinishCustomer -= NextCustomer;
+        storeEvent.OnExitEDC -= ExitEDC;
+        storeEvent.OnExitCashMachine -= ExitCashMachine;
     }
 
     public void AddCustomer(Customer newCustomer)
@@ -104,10 +117,18 @@ public class Cashier : MonoBehaviour
         switch (type)
         {
             case PaymentType.Cash:
+                Debug.Log($"Payment {value}");
                 paymentText.text = $"${value}";
+                cashMachine.SetTarget(value - currentBill, currentBill);
+
                 if (value == currentBill)
                 {
+                    storeEvent.ChangeCurrency(currentBill);
                     Invoke("HoldNextCustomer", 3f);
+                }
+                else
+                {
+                    cashMachine.ShowCashBox();
                 }
                 break;
             case PaymentType.Card:
@@ -155,5 +176,10 @@ public class Cashier : MonoBehaviour
         edcMachine.gameObject.transform.parent = dropPointEDC;
         edcMachine.gameObject.transform.localPosition = Vector3.zero;
         edcMachine.gameObject.transform.rotation = dropPointEDC.rotation;
+    }
+
+    void ExitCashMachine()
+    {
+        cashMachine.HideCashBox();
     }
 }

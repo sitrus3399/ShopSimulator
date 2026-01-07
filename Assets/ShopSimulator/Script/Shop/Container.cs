@@ -11,6 +11,7 @@ public class Container : MonoBehaviour
     private int maxItem;
 
     public int MaxItem {  get { return maxItem; } }
+    public int ItemsCount {  get { return items.Count; } }
     public List<string> PreloadAssetString { get { return preloadAssetString; } }
 
     public void CountMaxItem()
@@ -22,6 +23,9 @@ public class Container : MonoBehaviour
     {
         items.Add(tmpItem);
         tmpItem.gameObject.transform.position = itemLocation[items.Count - 1].position;
+        tmpItem.gameObject.transform.rotation = itemLocation[items.Count - 1].rotation;
+
+        tmpItem.gameObject.transform.SetParent(this.transform);
     }
 
     public void RemoveItem(Item tmpItem)

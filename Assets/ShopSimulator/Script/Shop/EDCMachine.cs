@@ -103,6 +103,7 @@ public class EDCMachine : MonoBehaviour
         {
             Debug.Log("Transaksi Berhasil: $" + totalPrice.ToString("F2"));
 
+            storeEvent.ChangeCurrency(targetPrice);
             storeEvent.FinishCustomer();
             Clear();
 

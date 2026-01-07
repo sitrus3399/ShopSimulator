@@ -7,6 +7,10 @@ TagManager:
   - Target
   - Bucket
   - Item
+  - Stain
+  - Case
+  - Container
+  - CardBox
   layers:
   - Default
   - TransparentFX
@@ -21,10 +25,10 @@ TagManager:
   - Face
   - Tool
   - Payment
-  - 
-  - 
-  - 
-  - 
+  - CashChange
+  - Stain
+  - Case
+  - Container
   - 
   - 
   - 

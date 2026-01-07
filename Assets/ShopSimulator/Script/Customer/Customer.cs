@@ -13,6 +13,8 @@ public class Customer : MonoBehaviour
     private List<string> buyList = new List<string>();
     private int currentItemIndex = 0;
 
+    [SerializeField] private Animator animator;
+
     private NavMeshAgent agent;
     [SerializeField] private float triggerDistance = 0.5f;
     [SerializeField] private float shelfTriggerDistance = 1.5f;
@@ -32,11 +34,17 @@ public class Customer : MonoBehaviour
     [SerializeField] private Payment cashPayment;
     [SerializeField] private Payment cardPayment;
 
+    [Header("Stain")]
+    [SerializeField] private GameObject stain;
+    [SerializeField] private float stainSpawnRate;
+
     public List<Item> ItemOnHand { get { return itemOnHand; } }
 
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
+
+        if (animator == null ) gameObject.GetComponent<Animator>();
 
         if (target != null)
         {
@@ -64,6 +72,11 @@ public class Customer : MonoBehaviour
 
     void Update()
     {
+        if (agent.velocity.magnitude > 0.1f && !agent.isStopped)
+            PlayRun();
+        else
+            PlayIdle();
+
         switch (state)
         {
             case CustomerState.ToStore:
@@ -133,6 +146,8 @@ public class Customer : MonoBehaviour
 
                                 if (item.ItemName == buyList[currentItemIndex])
                                 {
+                                    PlayTake();
+
                                     targetShelf.RemoveItem(item);
 
                                     itemOnHand.Add(item); // Dipindah ke tangan atau tas belanja
@@ -251,17 +266,21 @@ public class Customer : MonoBehaviour
                 CheckQueuePoint();
                 break;
             case CustomerState.OnCashier:
-                //Drop Item
-                //agent.isStopped = true;
+                
                 break;
             case CustomerState.ExitStore:
                 //agent.isStopped = false; // Mulai jalan lagi
                 //ShopManager.Instance.CashierDesk.RemoveCustomer(this);
                 storeEvent.OnPayment -= Payment;
 
+                float stainRate = Random.Range(0, 100);
+
+                if (stainRate <= stainSpawnRate)
+                {
+                    GameObject newStain = Instantiate(stain, transform.position, transform.rotation); 
+                }
+
                 SetTarget(ShopManager.Instance.FrontPoint);
-                
-                //CheckQueuePoint();
                 break;
             case CustomerState.ToDespawn:
                 SetTarget(CustomerManager.Instance.SpawnPoint);
@@ -346,17 +365,6 @@ public class Customer : MonoBehaviour
                 DropItemsToCashier();
             }
         }
-
-        //if (cashier.IsFirstInQueue(this) && !hasDroppedItems)
-        //{
-        //    cashier.SetFirstCustomer(this);
-
-        //    distance = Vector3.Distance(transform.position, target.position);
-        //    if (distance < triggerDistance)
-        //    {
-        //        DropItemsToCashier();
-        //    }
-        //}
     }
 
     private void DropItemsToCashier()
@@ -378,10 +386,9 @@ public class Customer : MonoBehaviour
 
     void Payment(float price)
     {
-        //int indexPayment = Random.Range(0, 3);
-        int indexPayment = 1;
+        PlayCash();
+        int indexPayment = Random.Range(0, 3);
 
-        Debug.Log(indexPayment);
         switch (indexPayment)
         {
             case 0: //Bayar pas
@@ -395,11 +402,44 @@ public class Customer : MonoBehaviour
             case 2: //Bayar lebih
                 cashPayment.gameObject.SetActive(true);
                 int addPrice = Random.Range(0, 20);
-                cardPayment.SetPrice(price + addPrice);
+                cashPayment.SetPrice(price + addPrice);
                 break;
             default:
                 break;
         }
+    }
+
+    //Animator
+    void ResetAllAnimatorTrigger()
+    {
+        animator.ResetTrigger("Idle");
+        animator.ResetTrigger("Run");
+        animator.ResetTrigger("Take");
+        animator.ResetTrigger("Cash");
+    }
+
+    void PlayIdle()
+    {
+        ResetAllAnimatorTrigger();
+        animator.SetTrigger("Idle");
+    }
+
+    void PlayRun()
+    {
+        ResetAllAnimatorTrigger();
+        animator.SetTrigger("Run");
+    }
+
+    void PlayTake()
+    {
+        ResetAllAnimatorTrigger();
+        animator.SetTrigger("Take");
+    }
+
+    void PlayCash()
+    {
+        ResetAllAnimatorTrigger();
+        animator.SetTrigger("Cash");
     }
 }
 

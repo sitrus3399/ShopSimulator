@@ -9905,12 +9905,15 @@ MonoBehaviour:
   storeEvent: {fileID: 11400000, guid: 892be80f07a4f234fb901a04d5743a2e, type: 2}
   state: 0
   target: {fileID: 0}
+  animator: {fileID: 5068596629287550307}
   triggerDistance: 1
   shelfTriggerDistance: 2
   searchWaitDuration: 2
   itemOnHandLocation: {fileID: 5846983366197662713}
   cashPayment: {fileID: 6544899351244280582}
   cardPayment: {fileID: 5154273875093306834}
+  stain: {fileID: 5524645085973569034, guid: 67070659b297025468c3288e349c00ea, type: 3}
+  stainSpawnRate: 30
 --- !u!195 &3674356106978001986
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -9942,8 +9945,8 @@ Animator:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8432998837405304917}
   m_Enabled: 1
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 0}
+  m_Avatar: {fileID: 9000000, guid: aa11f5f595800fd49b9b1a6e29a57c89, type: 3}
+  m_Controller: {fileID: 9100000, guid: 6da475ccc486cfe4fa5a3fa168f58bcb, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0

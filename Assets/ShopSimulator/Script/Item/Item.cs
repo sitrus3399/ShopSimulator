@@ -25,7 +25,7 @@ public class Item : MonoBehaviour
 
     private void Start()
     {
-        ChangeState(ItemState.Drop);
+        ChangeState(itemState);
         onCashier = false;
     }
 
@@ -83,6 +83,7 @@ public class Item : MonoBehaviour
         {
             if (itemState == ItemState.Drop)
             {
+                rb.velocity = Vector3.zero;
                 transform.position = ShopManager.Instance.CashierDesk.DropPoint.position;
             }
             else if (itemState == ItemState.Scan)

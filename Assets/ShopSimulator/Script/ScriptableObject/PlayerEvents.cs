@@ -8,6 +8,7 @@ public class PlayerEvents : ScriptableObject
     public Action<EDCMachine> OnUseEDC;
     public Action<Vector2> OnRotate;
     public Action<Vector3> OnMove;
+    public Action<float> OnUpdateCurrencyUI;
 
     public void Interact()
     {
@@ -28,5 +29,10 @@ public class PlayerEvents : ScriptableObject
     public void Move(Vector3 value)
     {
         OnMove?.Invoke(value);
+    }
+
+    public void UpdateCurrencyUI(float value)
+    {
+        OnUpdateCurrencyUI?.Invoke(value);
     }
 }

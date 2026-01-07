@@ -34,10 +34,22 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private GameObject currentTarget;
     private Item itemOnHand;
     [SerializeField] private Transform handPoint;
+    [SerializeField] private Transform frontPoint;
+
+    public Transform FrontPoint { get { return frontPoint; } }
 
     [Header("Payment")]
     [SerializeField] private Transform edcPoint;
     [SerializeField] private GameObject currentPayment;
+    [SerializeField] private GameObject currentCashChange;
+
+    [Header("Tool")]
+    [SerializeField] private ToolShop currentTool;
+    [SerializeField] private LayerMask caseLayer;
+
+    [Header("Platform")]
+    bool isMobile;
+    [SerializeField] private float mouseSensitivity;
 
     private void Start()
     {
@@ -49,6 +61,8 @@ public class PlayerController : MonoBehaviour
             playerCamera.gameObject.tag = "MainCamera";
 
         playerState = PlayerState.Idle;
+
+        SetupPlatform();
     }
 
     private void OnEnable()
@@ -56,6 +70,7 @@ public class PlayerController : MonoBehaviour
         playerEvent.OnMove += UpdateMoveInput;
         playerEvent.OnRotate += UpdateRotateInput;
         playerEvent.OnUseEDC += UseEDC;
+        storeEvent.OnExitEDC += ExitEDC;
     }
 
     private void OnDisable()
@@ -64,6 +79,20 @@ public class PlayerController : MonoBehaviour
         playerEvent.OnRotate -= UpdateRotateInput;
         playerEvent.OnInteract -= ScanItem;
         playerEvent.OnUseEDC -= UseEDC;
+        storeEvent.OnExitEDC -= ExitEDC;
+    }
+
+    private void SetupPlatform()
+    {
+#if UNITY_ANDROID || UNITY_IOS
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        isMobile = true;
+#else
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        isMobile = false;
+#endif
     }
 
     void UseEDC(EDCMachine edcMachine)
@@ -71,11 +100,27 @@ public class PlayerController : MonoBehaviour
         edcMachine.gameObject.transform.parent = edcPoint.transform;
         edcMachine.gameObject.transform.localPosition = Vector3.zero;
         edcMachine.gameObject.transform.rotation = edcPoint.rotation;
+
+        SetCursorLock(false);
+    }
+
+    void ExitEDC()
+    {
+        SetCursorLock(true);
     }
 
     private void Update()
     {
-        HandleRotation();
+        if (isMobile)
+        {
+            HandleRotation();
+        }
+        else if (!isMobile && Cursor.lockState == CursorLockMode.Locked)
+        {
+            HandleInputPerPlatform();
+            HandleMouseInteraction();
+        }
+        
         HandleRaycast();
     }
 
@@ -84,6 +129,50 @@ public class PlayerController : MonoBehaviour
         if (playerState == PlayerState.Idle)
         {
             HandleMovement();
+        }
+    }
+
+    void HandleMouseInteraction()
+    {
+        if (Input.GetMouseButtonDown(0))
+        {
+            playerEvent.OnInteract?.Invoke();
+        }
+    }
+
+    void HandleInputPerPlatform()
+    {
+        float h = Input.GetAxisRaw("Horizontal");
+        float v = Input.GetAxisRaw("Vertical");
+        currentMoveInput = new Vector3(h, 0, v);
+
+        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
+        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
+
+        currentLookInput = new Vector2(mouseX, mouseY);
+
+        float rotateY = currentLookInput.x;
+
+        transform.Rotate(Vector3.up * rotateY);
+        float rotateX = currentLookInput.y;
+
+        xRotation -= rotateX;
+        xRotation = Mathf.Clamp(xRotation, verticalLookLimitBottom, verticalLookLimitTop);
+
+        playerCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+    }
+
+    void SetCursorLock(bool isLock)
+    {
+        if (isLock)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+        else
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
     }
 
@@ -120,18 +209,25 @@ public class PlayerController : MonoBehaviour
         RaycastHit hit;
         Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
 
+        LayerMask maskToUse = (currentTool == null)
+            ? allLayer
+            : (currentTool.TargetLayer | caseLayer);
+
         if (Physics.Raycast(ray, out hit, raycastDistance, allLayer))
         {
-            GameObject hitObject = hit.collider.gameObject;
-
-            if (hitObject != currentTarget)
+            if (playerState == PlayerState.Idle || playerState == PlayerState.Cashier)
             {
-                ClearPreviousTarget();
-                currentTarget = hitObject;
-                SetupNewTarget(hitObject, hit.collider.gameObject.layer);
-            }
+                GameObject hitObject = hit.collider.gameObject;
 
-            UpdateUIPosition(hit.point);
+                if (hitObject != currentTarget)
+                {
+                    ClearPreviousTarget();
+                    currentTarget = hitObject;
+                    SetupNewTarget(hitObject, hit.collider.gameObject.layer);
+                }
+
+                UpdateUIPosition(hit.point);
+            }
         }
         else
         {
@@ -145,32 +241,75 @@ public class PlayerController : MonoBehaviour
 
     private void SetupNewTarget(GameObject obj, int layer)
     {
-        if (layer == LayerMask.NameToLayer("Item"))
+        if (currentTool == null)
         {
-            currentItem = obj;
-            playerEvent.OnInteract += ScanItem;
-            SetUIState(true, false);
-        }
-        else if (layer == LayerMask.NameToLayer("Tool"))
-        {
-            playerEvent.OnInteract += GrabItem;
-            SetUIState(true, false);
-        }
-        else if (layer == LayerMask.NameToLayer("Stain"))
-        {
-            playerEvent.OnInteract += CleanStain;
-            SetUIState(true, false);
-        }
-        else if (layer == LayerMask.NameToLayer("Payment"))
-        {
-            currentPayment = obj;
+            Debug.Log($"Not Have tool {layer}");
+            if (layer == LayerMask.NameToLayer("Item"))
+            {
+                currentItem = obj;
+                playerEvent.OnInteract += ScanItem;
+                SetUIState(true, false);
+            }
+            else if (layer == LayerMask.NameToLayer("Tool"))
+            {
+                playerEvent.OnInteract += GrabTool;
+                SetUIState(true, false);
+            }
+            else if (layer == LayerMask.NameToLayer("Case"))
+            {
+                playerEvent.OnInteract += InteractCase;
+                SetUIState(true, false);
+            }
+            else if (layer == LayerMask.NameToLayer("Payment"))
+            {
+                currentPayment = obj;
 
-            playerEvent.OnInteract += TakePayment;
-            SetUIState(true, false);
+                playerEvent.OnInteract += TakePayment;
+                SetUIState(true, false);
+            }
+            else if (layer == LayerMask.NameToLayer("CashChange"))
+            {
+                currentCashChange = obj;
+
+                playerEvent.OnInteract += TakeCashChange;
+                SetUIState(true, false);
+            }
+            else
+            {
+                SetUIState(false, true);
+            }
         }
         else
         {
-            SetUIState(false, true);
+            Debug.Log($"Have tool {layer}");
+            if (layer == LayerMask.NameToLayer("Case"))
+            {
+                playerEvent.OnInteract += InteractCase;
+                SetUIState(true, false);
+            }
+            else if (layer == LayerMask.NameToLayer("Stain"))
+            {
+                if (currentTool.CompareTag("CardBox"))
+                {
+                    playerEvent.OnInteract += DropTool;
+                }
+                playerEvent.OnInteract += useTool;
+                SetUIState(true, false);
+            }
+            else if (layer == LayerMask.NameToLayer("Container"))
+            {
+                playerEvent.OnInteract += useTool;
+                SetUIState(true, false);
+            }
+            else
+            {
+                if (currentTool.CompareTag("CardBox"))
+                {
+                    playerEvent.OnInteract += DropTool;
+                }
+
+                SetUIState(false, true);
+            }
         }
     }
 
@@ -179,13 +318,17 @@ public class PlayerController : MonoBehaviour
         if (currentTarget == null) return;
 
         playerEvent.OnInteract -= ScanItem;
-        playerEvent.OnInteract -= GrabItem;
-        playerEvent.OnInteract -= CleanStain;
+        playerEvent.OnInteract -= GrabTool;
+        playerEvent.OnInteract -= DropTool;
+        playerEvent.OnInteract -= useTool;
         playerEvent.OnInteract -= TakePayment;
+        playerEvent.OnInteract -= TakeCashChange;
+        playerEvent.OnInteract -= InteractCase;
 
         currentTarget = null;
         ResetGrabTarget();
         ResetPaymentTarget();
+        ResetCashChangeTargetTarget();
     }
 
     private void SetUIState(bool redActive, bool whiteActive)
@@ -222,15 +365,59 @@ public class PlayerController : MonoBehaviour
     {
         currentPayment = null;
     }
-
-    void GrabItem()
+    
+    private void ResetCashChangeTargetTarget()
     {
-
+        currentCashChange = null;
     }
 
-    void CleanStain()
+    void GrabTool()
     {
+        currentTool = currentTarget.GetComponent<ToolShop>();
+        currentTool.Grab(handPoint);
+    }
 
+    public void RemoveTool()
+    {
+        currentTool = null;
+    }
+
+    void InteractCase()
+    {
+        Case newCase = currentTarget.GetComponent<Case>();
+        newCase.InteractCase(this, currentTool);
+    }
+
+    public void GrabToolFromCase(ToolShop tool)
+    {
+        if (currentTool != null)
+        {
+            AudioManager.Instance.PlaySFX("Click");
+            DropTool();
+            RemoveTool();
+        }
+
+        currentTool = tool;
+        currentTool.Grab(handPoint);
+    }
+
+    void DropTool()
+    {
+        if (currentTool != null)
+        {
+            AudioManager.Instance.PlaySFX("Click");
+            currentTool.Drop();
+            RemoveTool();
+        }
+    }
+
+    void useTool()
+    {
+        if (currentTool != null)
+        {
+            AudioManager.Instance.PlaySFX("Click");
+            currentTool.Use(currentTarget);
+        }
     }
 
     void ScanItem()
@@ -241,6 +428,7 @@ public class PlayerController : MonoBehaviour
 
         if (!itemOnHand) return;
 
+        AudioManager.Instance.PlaySFX("Scan");
         itemOnHand.ChangeState(ItemState.Scan);
     }
 
@@ -248,8 +436,19 @@ public class PlayerController : MonoBehaviour
     {
         if (currentPayment != null)
         {
+            AudioManager.Instance.PlaySFX("Money");
             Payment tmpPayment = currentPayment.GetComponent<Payment>();
             storeEvent.TakePayment(tmpPayment.Price, tmpPayment.PaymentType);
+        }
+    }
+
+    void TakeCashChange()
+    {
+        if (currentCashChange != null)
+        {
+            AudioManager.Instance.PlaySFX("Money");
+            CashChange tmpCashChange = currentCashChange.GetComponent<CashChange>();
+            tmpCashChange.Take();
         }
     }
 }
@@ -260,4 +459,5 @@ public enum PlayerState
     Idle,
     Cashier,
     Cleaning,
+    UsingTool,
 }
