@@ -85,8 +85,6 @@ public class PlayerController : MonoBehaviour
     private void SetupPlatform()
     {
 #if UNITY_ANDROID || UNITY_IOS
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
         isMobile = true;
 #else
         Cursor.lockState = CursorLockMode.Locked;
@@ -164,15 +162,18 @@ public class PlayerController : MonoBehaviour
 
     void SetCursorLock(bool isLock)
     {
-        if (isLock)
+        if (!isMobile)
         {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
-        else
-        {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            if (isLock)
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
+            else
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
         }
     }
 
